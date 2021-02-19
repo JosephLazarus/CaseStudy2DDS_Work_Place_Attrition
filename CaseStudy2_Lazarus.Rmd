@@ -23,14 +23,20 @@ CaseStudy2-Data.csv:
 * CaseStudy2CompSet No Solary.csv
 
 
-```{r}
-
+```{r cars}
 #Load Libraries needed for analysis
 library(dplyr)
+library(rplot)
 library(tidyverse)
 library(visdat)
 library(GGally)
+library(class)
+library(plotly)
+library(caret)
+library(e1071)
 library(ggplot2)
+library(caret)
+library(class)
 library(skimr)
 library(stringr)
 library(corrplot)
@@ -39,6 +45,7 @@ library(ggthemes)
 library(vcd)
 library(rpart.plot)
 library(BBmisc)
+library(tensorflow)
 ```
 Load Theme for plots
 
@@ -102,7 +109,6 @@ str(df)
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #                   Exploratoration into Data
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 ```{r}
 
 #Look at Age
@@ -201,29 +207,20 @@ df$time.at.past.job <- ifelse(df$NumCompaniesWorked!=0, df$TotalWorkingYears-df$
 
 #found this column to not enhance the models unitil i normalized it
 df$ntime.at.past.job <- normalize(df$time.at.past.job, method = "standardize", margin = 1L, on.constant ="quiet" )
-         #df$ntime.at.past.job
+df$ntime.at.past.job
 
 ```
-
-
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #             Prepare data for Modeling  Train Test SPlit
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-
 ```{r}
-detach("package:BBmisc")
+df$ntime.at.past.job <- normalize(df$time.at.past.job,  method = "standardize", on.constant = "quiet")
+
 
 #notice I've made attrition the first column. That makes it easy to pull out for our train/test/splits when modeling. ID isn't in here but will add it back at the end for our validation / competition.
+dat <- select(df, c("Attrition", "Age",'NumCompaniesWorked', 'ntime.at.past.job', 'DistanceFromHome', 'EnvironmentSatisfaction','JobInvolvement', 'JobSatisfaction', 'RelationshipSatisfaction','StockOptionLevel','TotalWorkingYears','TrainingTimesLastYear', 'WorkLifeBalance', 'YearsInCurrentRole',  'YearsSinceLastPromotion','YearsWithCurrManager','iJobRole', 'iDepartment', "iMaritalStatus"))
 
-#getting : object 'MonthlyIncome' not found add in monthly income
-#did not find it to be helpful in the knn analysis
-# taking these out for fun   2/171625
-
-dat <- select(df, c(3,2,5,7,8,10, 12, 13, 14, 16, 18, 20, 21, 22, 23, 24, 25, 26, 27, 29, 30, 31, 44, 39, 40, 43))
-
-
-set.seed(43) # was 31 chainging to another prime
+set.seed(31)
 
 sample_size = round(nrow(dat)*.70) # setting what is 70%
 index <- sample(seq_len(nrow(dat)), size = sample_size)
@@ -236,51 +233,26 @@ dim(training)
 dim(test)
 
 str(training)
-detach("package:dplyr") 
-detach("package:stringr")
-detach("package:tidyverse")
+
 
 ```
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #                    find important Variables
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-
 ```{r}
 #This was an interative step between modeling data preparation and EDA as well.
 
 roc_imp <- filterVarImp(x = training[-1], y = training$Attrition)
 head(roc_imp)
 roc_imp
-
-
 ```
-
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #                            Begin Modeling
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#                         1. Support Vector Model
+#                     1. Model Decesion Tree
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-```{r}
-set.seed(31)
-SVMModel <- train(Attrition~., training , method = 'svmRadial',trControl = trainControl(method = 'repeatedcv',number = 3))
-#Predict
-SVM.pred <- predict(SVMModel,test)
-#Print confusion matrix
-SVM.CM <- confusionMatrix(test$Attrition, SVM.pred)
-SVM.CM
-
-
-```
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#                     2. Model Decesion Tree
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-
 ```{r, Decesion Tree Model}
-
 set.seed(31) # I like to use prime numbers as seeds. IDK why. Just like 'em
 
 DTModel <-rpart(formula = Attrition ~., data = training, method = 'class')
@@ -292,55 +264,32 @@ rpart.plot(DTModel)
 
 DTModel_pred = predict(DTModel, newdata = test[-1], type = 'class')
 # confusion matrix
-DTM.CM <- confusionMatrix(DTModel_pred, as.factor(test$Attrition))
+DTM.CM <- confusionMatrix(DTModel_pred, as.factor(test$iAttrition))
 #notice I'm saving my confusion matrixes as an object with a standard name this will be important for us to compare our models at the end
 DTM.CM
 
 ```
-
-
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#                       3. KNN Model 
+#                       2. KNN Model 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 ```{r, K Nearest Neighbors}
-
-
-
+library(class)
 set.seed(31) #get that prime number ready
 
 #Fit the model on train data
 KnnModel <- train(Attrition~.,training, method = 'knn')
-    #trControl = trainControl(method = 'repeatedcv', number = 3))
-
+                #trControl = trainControl(method = 'repeatedcv', number = 3))
+#trControl = trainControl(method = 'repeatedcv',number = 3)
 #Predict with test set
-Knn.pred <- predict(KnnModel, test[-1])
+Knn_pred <- predict(KnnModel, test[-1])
 #Print confusion matrix
-Knn.CM <- confusionMatrix(Knn.pred, as.factor(test$Attrition))
+Knn.CM <- confusionMatrix(Knn_pred, as.factor(test$Attrition))
 Knn.CM
-
 ```
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #                             Hyper Parameter tunning
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-
 ```{r, Hyper Parameter Tuning}
-#using the class package to have more control
-detach("package:caret")   
-library(class)
-library(caret)
-library(dplyr)
-
-dat2 <- select(df, c("Attrition", "Age",'NumCompaniesWorked', 'ntime.at.past.job', 
-                    'DistanceFromHome', 'EnvironmentSatisfaction','JobInvolvement', 
-                    'JobSatisfaction', 'RelationshipSatisfaction','StockOptionLevel', 
-                    'TotalWorkingYears','TrainingTimesLastYear', 'WorkLifeBalance', 
-                    'YearsInCurrentRole', 'YearsSinceLastPromotion','YearsWithCurrManager',
-                    'iJobRole', 'iDepartment', "iMaritalStatus"))
-
-detach("package:dplyr")
-
 set.seed(443) # big prime no wammies
 iterations = 500
 numks = 20
@@ -352,9 +301,9 @@ masterSpec = matrix(nrow = iterations, ncol = numks)
 
 for(j in 1:iterations)
 {
-  trainIndices2 <- sample(1:dim(dat2)[1],round(splitPerc * dim(dat2)[1]))
-  train.k2 <- dat2[trainIndices2,]
-  test.k2 <- dat2[-trainIndices2,]
+  trainIndices2 <- sample(1:dim(dat)[1],round(splitPerc * dim(dat)[1]))
+  train.k2 <- dat[trainIndices2,]
+  test.k2 <- dat[-trainIndices2,]
   
   for(i in 1:numks)
   {
@@ -371,18 +320,17 @@ for(j in 1:iterations)
 MeanAcc = colMeans(masterAcc)
 MeanSens = colMeans(masterSens)
 MeanSpec = colMeans(masterSpec)
-
 par(mfrow=c(1,1))
 plot(seq(1,numks,1),MeanAcc, type = "l",xlab="k",ylab="Mean Accuracy",main="Optimal k for max Accuracy sd 7 dat norm time",sub="NA values omitted")
-plot(seq(1,numks,1), MeanSens, type = "l" ,main="Sensitivity seed 7 dat norm time")
-plot(seq(1,numks,1), MeanSpec, type = "l", main = "Specificty seed 7 dat norm time")
+plot(seq(1,numks,1),MeanSens, type = "l" ,main="Sensitivity seed 7 dat norm time")
+plot(seq(1,numks,1),MeanSpec, type = "l", main = "Specificty seed 7 dat norm time")
 
 which.max(MeanAcc)
 max(MeanAcc)
 which.max(MeanSens)
 max(MeanSens)
 which.max(MeanSpec)
-max(na.omit(MeanSpec)) #best avg sensitivity i could produce us 0.658
+max(na.omit(MeanSpec)) #best sensitivity i could produce us 0.658 k=9
 
 set.seed(29)
 
@@ -393,13 +341,12 @@ table(test.k2$Attrition, classifications)
 KNN.CM = confusionMatrix(table(test.k2$Attrition, classifications))
 KNN.CM
 
-#confusion Matrix Graph Function
 draw_confusion_matrix <- function(cm,Class1,Class2) {
   
   layout(matrix(c(1,1,2)))
   par(mar=c(2,2,2,2))
   plot(c(100, 345), c(300, 450), type = "n", xlab="", ylab="", xaxt='n', yaxt='n')
-  title('KNN CONFUSION MATRIX', cex.main=2)
+  title('CONFUSION MATRIX', cex.main=2)
   
   # create the matrix 
   rect(150, 430, 240, 370, col='#3F97D0')
@@ -442,21 +389,32 @@ draw_confusion_matrix <- function(cm,Class1,Class2) {
 
 
 draw_confusion_matrix(KNN.CM,"Attrition No","Attrition Yes")
-
-
 ```
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#                   3. Naive Bayes
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+```{r, NB}
+set.seed(31)
+library(e1071)
+#Fit the model on train data
+NBModel <- naiveBayes(Attrition ~., data=training, laplace = -1, usekernel = TRUE)
+
+#Validate on test set
+NBM_pred <- predict(NBModel, newdata =test[-1])
+
+
+#Print confusion matrix
+NBM.CM<-confusionMatrix(NBM_pred, as.factor(test$Attrition))
+NBM.CM
 
 
 
-
-
+draw_confusion_matrix(NBM.CM,"Attrition No","Attrition Yes")
+```
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #                         4. GLM
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-
-
 ```{r, General Linear Regression Model}
 set.seed(31)
 
@@ -479,90 +437,10 @@ GLM.CM
 #drop.CM
 
 ```
-
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#                   5. Naive Bayes
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-
-
-```{r, NB}
-
-detach("package:caret")
-detach("package:class")
-set.seed(31)
-library(e1071)
-#Fit the model on train data
-NBModel <- naiveBayes(Attrition ~., data=training, laplace = -1, usekernel = TRUE)
-
-#Validate on test set
-NBM_pred <- predict(NBModel, newdata =test[-1])
-
-library(caret)
-#Print confusion matrix
-NBM.CM<-confusionMatrix(NBM_pred, as.factor(test$Attrition))
-NBM.CM
-
-
-draw_confusion_matrix <- function(cm,Class1,Class2) {
-  
-  layout(matrix(c(1,1,2)))
-  par(mar=c(2,2,2,2))
-  plot(c(100, 345), c(300, 450), type = "n", xlab="", ylab="", xaxt='n', yaxt='n')
-  title('N.B. CONFUSION MATRIX', cex.main=2)
-  
-  # create the matrix 
-  rect(150, 430, 240, 370, col='#3F97D0')
-  text(195, 435, Class1, cex=1.2)
-  rect(250, 430, 340, 370, col='#F7AD50')
-  text(295, 435, Class2, cex=1.2)
-  text(125, 370, 'Predicted', cex=1.3, srt=90, font=2)
-  text(245, 450, 'Actual', cex=1.3, font=2)
-  rect(150, 305, 240, 365, col='#F7AD50')
-  rect(250, 305, 340, 365, col='#3F97D0')
-  text(140, 400, Class1, cex=1.2, srt=90)
-  text(140, 335, Class2, cex=1.2, srt=90)
-  
-  # add in the cm results 
-  res <- as.numeric(cm$table)
-  text(195, 400, res[1], cex=1.6, font=2, col='white')
-  text(195, 335, res[2], cex=1.6, font=2, col='white')
-  text(295, 400, res[3], cex=1.6, font=2, col='white')
-  text(295, 335, res[4], cex=1.6, font=2, col='white')
-  
-  # add in the specifics 
-  plot(c(100, 0), c(100, 0), type = "n", xlab="", ylab="", main = "DETAILS", xaxt='n', yaxt='n')
-  text(10, 85, names(cm$byClass[1]), cex=1.2, font=2)
-  text(10, 70, round(as.numeric(cm$byClass[1]), 3), cex=1.2)
-  text(30, 85, names(cm$byClass[2]), cex=1.2, font=2)
-  text(30, 70, round(as.numeric(cm$byClass[2]), 3), cex=1.2)
-  text(50, 85, names(cm$byClass[5]), cex=1.2, font=2)
-  text(50, 70, round(as.numeric(cm$byClass[5]), 3), cex=1.2)
-  text(70, 85, names(cm$byClass[6]), cex=1.2, font=2)
-  text(70, 70, round(as.numeric(cm$byClass[6]), 3), cex=1.2)
-  text(90, 85, names(cm$byClass[7]), cex=1.2, font=2)
-  text(90, 70, round(as.numeric(cm$byClass[7]), 3), cex=1.2)
-  
-  # add in the accuracy information 
-  text(30, 35, names(cm$overall[1]), cex=1.5, font=2)
-  text(30, 20, round(as.numeric(cm$overall[1]), 3), cex=1.4)
-  text(70, 35, names(cm$overall[2]), cex=1.5, font=2)
-  text(70, 20, round(as.numeric(cm$overall[2]), 3), cex=1.4)
-}  
-
-draw_confusion_matrix(NBM.CM,"Attrition No","Attrition Yes")
-
-
-```
-
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #                     5. Random Forest
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-
 ```{r, RF}
-
-detach("package:e1071")
 #caret and randomForest packages don't place nice together
 library(randomForest)
 #fitting random forest classification to the training set
@@ -576,46 +454,40 @@ RF.pred = predict(RFModel,newdata = test[-1],type="response")
 #Making the confucion matrix
 RFM.CM<-confusionMatrix(RF.pred, test$Attrition)
 RFM.CM
-
-
 ```
-
-
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #                   Explorator Analysis on the Models
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-
 ```{r, Model EDA}
-
-
 library(ggplot2)
 library(dplyr)
-
-
 Sensitivities <- c(DTM.CM$byClass["Sensitivity"], GLM.CM$byClass["Sensitivity"], 
                    NBM.CM$byClass["Sensitivity"], KNN.CM$byClass["Sensitivity"], 
-                   RFM.CM$byClass["Sensitivity"], SVM.CM$byClass["Sensitivity"])
+                   RFM.CM$byClass["Sensitivity"])
 
 Specificities <- c(DTM.CM$byClass["Specificity"], GLM.CM$byClass["Specificity"], 
                    NBM.CM$byClass["Specificity"], KNN.CM$byClass["Specificity"], 
-                   RFM.CM$byClass["Specificity"], SVM.CM$byClass["Specificity"])
+                   RFM.CM$byClass["Specificity"])
 
 Precisions <- c(DTM.CM$byClass["Precision"], GLM.CM$byClass["Precision"], 
                 NBM.CM$byClass["Precision"], KNN.CM$byClass["Precision"],
-                RFM.CM$byClass["Percision"], SVM.CM$byClass["Percision"])
+                RFM.CM$byClass["Percision"])
 
 Recalls <- c(DTM.CM$byClass["Recall"], GLM.CM$byClass["Recall"], 
-             NBM.CM$byClass["Recall"], KNN.CM$byClass["Recall"], RFM.CM$byClass["Recall"], SVM.CM$byClass["Recall"])
+             NBM.CM$byClass["Recall"], KNN.CM$byClass["Recall"], RFM.CM$byClass["Recall"])
 
-Accuracies <- c(DTM.CM$overall[1], GLM.CM$overall[1], NBM.CM$overall[1], KNN.CM$overall[1], RFM.CM$overall[1], SVM.CM$overall[1] )
+Accuracies <- c(DTM.CM$overall[1], GLM.CM$overall[1], NBM.CM$overall[1], KNN.CM$overall[1], 
+                RFM.CM$overall[1])
 
-Balanced_Accuracies <- c(DTM.CM$byClass["BalancedAccuracy"], GLM.CM$byClass["Balanced Accuracy"], NBM.CM$byClass["Balanced Accuracy"], KNN.CM$byClass["Balanced Accuracy"], RFM.CM$byClass["Balanced Accuracy"],  SVM.CM$byClass["Balanced Accuracy"])
+Balanced_Accuracies <- c(DTM.CM$byClass["Balanced Accuracy"],GLM.CM$byClass["Balanced Accuracy"], 
+                         NBM.CM$byClass["Balanced Accuracy"], KNN.CM$byClass["Balanced Accuracy"],
+                         RFM.CM$byClass["Balanced Accuracy"])
 
-F1_Scores <- c(DTM.CM$byClass["F1"], GLM.CM$byClass["F1"], NBM.CM$byClass["F1"], KNN.CM$byClass["F1"], RFM.CM$byClass["F1"], SVM.CM$byClass["F1"])
+F1_Scores <- c(DTM.CM$byClass["F1"], GLM.CM$byClass["F1"], NBM.CM$byClass["F1"], 
+               KNN.CM$byClass["F1"], RFM.CM$byClass["F1"])
 
 #Create a data frame from the metrics in confusion matrixes and models
-Models  <- c("DTM", "GLM", "NBM", "KNN", "RFM", "SVM")
+Models  <- c("DTM", "GLM", "NBM", "KNN", "RFM")
 casestudy.results <- data.frame(Models, Sensitivities, Specificities, Precisions, Recalls, F1_Scores, Accuracies, Balanced_Accuracies)
 
 casestudy.results
@@ -644,7 +516,8 @@ ba.p <- casestudy.results %>% ggplot(aes(Models, Balanced_Accuracies, fill = Mod
 f1.p <- casestudy.results %>% ggplot(aes(Models, F1_Scores, fill = Models)) + geom_bar(stat='identity', alpha = 0.5) + 
   geom_text(aes(label=F1_Scores),vjust=3, size = 4) + ggtitle('Comparative F1_Scores') + xlab('') + ylab('')
 
- 
+
+# The KNN model is the only one that meets the requirements of 60% / %60 I thought that the Naive Bayes model was doing a better. But this was helpful to see it on graph form. 
 sn.p
 sp.p
 pr.p
@@ -652,149 +525,68 @@ ba.p
 f1.p
 
 ```
-
-
-
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #                Begin Attrition Competition 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-
-
 ```{r, Attrition Competition}
 
 #read in the competition Data set
 attritionCompSet <- read.csv("https://raw.githubusercontent.com/JosephLazarus/CaseStudy2DDS_Work_Place_Attrition/main/CaseStudy2CompSet%20No%20Attrition.csv")
 
-
-head(attritionCompSet)
-# attach attritionCompSet to read variavles locally
-attach(attritionCompSet)
-
-#explore data structure 
+# Next steps are to process the data the same way i did before. Though I am not going to make the group factors since I did not find them to be useful. In my models
 
 str(attritionCompSet)
-
-dim(attritionCompSet) #870 X 36
-
-which(is.na(attritionCompSet)) # no NA's I don't believe it
-
-colSums(is.na(attritionCompSet)) # still no NA's I believe it now
-
-# 870 obs x 36 variables
-# no NA's
-
 summary(attritionCompSet)
+dim(attritionCompSet) # 300 X 35
 
-skim(attritionCompSet) #over18  Employeecount Standardhours have no variation
+which(is.na(attritionCompSet)) # makes sure no funny business is going here
 
-#removing these variables from the data set
+colSums(is.na(attritionCompSet)) # still 0
+
 attritionCompSet <- select(attritionCompSet, -c(Over18, EmployeeCount, StandardHours, EmployeeNumber))
+dim(attritionCompSet) #300 X 31
 
-#convert char variables to factors
+
+which(is.na(attritionCompSet)) # double check 
+
+
+#convert interger vars to factors
 var_facs <- c("EducationField","MaritalStatus","BusinessTravel","JobRole", "Department", "OverTime", "Gender")
 attritionCompSet[,var_facs] <- lapply(attritionCompSet[,var_facs] , factor, ordered = FALSE)
 
-#convert those factors to (i) integers for later
 attritionCompSet$iJobRole <- as.integer(attritionCompSet$JobRole)
 attritionCompSet$iDepartment <- as.integer(attritionCompSet$Department)
 attritionCompSet$iMaritalStatus <- as.integer(attritionCompSet$MaritalStatus)
 attritionCompSet$iBusinessTravel <- as.integer(attritionCompSet$BusinessTravel)
 attritionCompSet$iEducation <- as.integer(attritionCompSet$Education)
 
-
-#quick check of our data
 str(attritionCompSet)
+colSums(is.na(attritionCompSet))
 
-attritionCompSet <- mutate(attritionCompSet, Age.Group = as.factor(case_when(Age <= 22 ~ 'Undergrad',
-                                                 Age <= 34 ~'Young-Professional',
-                                                 Age <= 44 ~ 'Veteran',
-                                                 Age >= 45 ~ 'Senior')))
-#use quantiles to pick income brackets
-quantile(MonthlyIncome)
-
-attritionCompSet <- mutate(attritionCompSet, MonthlyIncome.Group = as.factor(case_when(MonthlyIncome <= 2800 ~ 'Low',
-                                                           MonthlyIncome <=4999 ~ 'Avg', 
-                                                           MonthlyIncome <=7999 ~ 'Above.Avg',
-                                                           MonthlyIncome >=8000 ~ 'High')))
-
-
-
-attritionCompSet <- mutate(attritionCompSet, YearsWithCurrManager.Group = as.factor(case_when(YearsWithCurrManager <= 2 ~ "Lessthan2",
-                                                                  YearsWithCurrManager <= 4 ~ "2thru4",
-                                                                  YearsWithCurrManager <= 6.9 ~ "4thru6",
-                                                                  YearsWithCurrManager >= 7~ "7&above")))
-
-
-
-attritionCompSet <-  mutate(attritionCompSet, YearsInCurrentRole.Group = as.factor(case_when(YearsInCurrentRole <=2 ~ "Lessthan2", 
-                                                                 YearsInCurrentRole <= 3 ~ "Lessthan3",
-                                                                 YearsInCurrentRole <= 4 ~ "Lessthan4",
-                                                                 YearsInCurrentRole >4 ~ "5&above")))
-
-
-
-attritionCompSet <- mutate(attritionCompSet, YearsAtCompany.Group = as.factor(case_when(YearsAtCompany <= 3 ~ "LessThan3",
-                                                            YearsAtCompany <= 5 ~"3thru5",
-                                                            YearsAtCompany <= 10 ~"5thru10",
-                                                            YearsAtCompany > 10 ~"10&above")))
-
-
-
-#chceck for gaps
-which(is.na(attritionCompSet))
-str(attritionCompSet)
-length(attritionCompSet)
-
-#since number of companies worked at prior lets explore further create New variable of time spent in previous jobs subtratct total work years from years at company divide by number of companies worked for
+#calculating the time at previous job column
 attritionCompSet$time.at.past.job <- ifelse(attritionCompSet$NumCompaniesWorked!=0, attritionCompSet$TotalWorkingYears-attritionCompSet$YearsAtCompany/attritionCompSet$NumCompaniesWorked,0)
 
 library(BBmisc)
-#found this column to not enhance the models unitil i normalized it
-attritionCompSet$ntime.at.past.job <- normalize(attritionCompSet$time.at.past.job, method = "standardize", margin = 1L, on.constant ="quiet" )
-
-detach("package:BBmisc")
-
-#don't forget ID
-
-attritionPredictionData <- select(attritionCompSet, c("ID","Age","DailyRate","DistanceFromHome" ,"Education","EnvironmentSatisfaction","HourlyRate" ,"JobInvolvement", "JobLevel" , "JobSatisfaction" ,"MonthlyIncome", "NumCompaniesWorked", "OverTime", "PercentSalaryHike","PerformanceRating" ,"RelationshipSatisfaction","StockOptionLevel", "TotalWorkingYears" , "TrainingTimesLastYear", "YearsAtCompany" ,"YearsInCurrentRole","YearsSinceLastPromotion" ,"time.at.past.job" ,"Age.Group", "MonthlyIncome.Group" ,"YearsAtCompany.Group"))
+attritionCompSet$ntime.at.past.job <- normalize(attritionCompSet$time.at.past.job,  method = "standardize", on.constant = "quiet")
 
 
+attritionPredictionData <- select(attritionCompSet, c("ID","Age",'NumCompaniesWorked', 'ntime.at.past.job','DistanceFromHome', 'EnvironmentSatisfaction','JobInvolvement', 'JobSatisfaction', 'RelationshipSatisfaction','StockOptionLevel','TotalWorkingYears', 'TrainingTimesLastYear', 'WorkLifeBalance', 'YearsInCurrentRole', 'YearsSinceLastPromotion','YearsWithCurrManager','iJobRole', 'iDepartment', "iMaritalStatus"))
 
 colnames(attritionPredictionData)
+summary(attritionPredictionData)
 colSums(is.na(attritionPredictionData)) # Triple check before we begin modeling
-
-
 ```
-
-
-
-
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #                          Make Attrition Predictions
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-
-
-
 ```{r, Run the Model}
+set.seed(7919)
 
-
-set.seed(7919) #big prime no wammies
-
-detach("package:randomForest")      
-
-library(class) #bring that library back in case randomForest masked it
-library(caret)#bring that library back in case randomForest masked it
-
-SVMModel2 <- train(Attrition~., dat, method = 'svmRadial',trControl = trainControl(method = 'repeatedcv',number = 3))
-
-#predict
-SVM.pred2 <- predict(SVMModel2,attritionPredictionData)
-
+#using the KNN model on the entire
+predictAttrit = knn(dat[,2:19],attritionPredictionData[,2:19], dat$Attrition, k=9, prob= TRUE)
 
 #saving the object as a back up
-Attrition <- SVM.pred2
+Attrition <- predictAttrit
 
 #conver to a data frame 
 Attrition = as.data.frame(Attrition)
@@ -803,42 +595,24 @@ Attrition = as.data.frame(Attrition)
 case2predictions <- cbind(attritionPredictionData,Attrition)
 
 #scrub the data set so only ID and attritions predictions remain
-case2predictions <- select(case2predictions, -c("Age","DailyRate","DistanceFromHome" ,"Education","EnvironmentSatisfaction","HourlyRate" ,"JobInvolvement", "JobLevel" , "JobSatisfaction" ,"MonthlyIncome", "NumCompaniesWorked", "OverTime", "PercentSalaryHike","PerformanceRating" ,"RelationshipSatisfaction","StockOptionLevel", "TotalWorkingYears" , "TrainingTimesLastYear", "YearsAtCompany" ,"YearsInCurrentRole","YearsSinceLastPromotion" ,"time.at.past.job" ,"Age.Group", "MonthlyIncome.Group" ,"YearsAtCompany.Group"))
+case2predictions <- select(case2predictions, -c("Age",'NumCompaniesWorked', 'ntime.at.past.job','DistanceFromHome', 'EnvironmentSatisfaction','JobInvolvement', 'JobSatisfaction', 'RelationshipSatisfaction','StockOptionLevel', 'TotalWorkingYears', 'TrainingTimesLastYear', 'WorkLifeBalance', 'YearsInCurrentRole', 
+'YearsSinceLastPromotion','YearsWithCurrManager','iJobRole', 'iDepartment', "iMaritalStatus"))
+
 #write it a csv in submission format
-write.csv(case2predictions,"Case2Predictions_LAZARUS_Attrition_SVM_model.csv", row.names = FALSE)
-
-
+write.csv(case2predictions,"Case2PredictionsLAZARUSAttrition.csv", row.names = FALSE)
 ```
-
-
-
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #                        Begin Salary Modeling
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-
-
 ```{r, Salary objective: Predictions < 3000 RMSE}
-
-
 #creating a salary data this was an iteriative process between EDA, filtervarImp function and the models
 
 saldat <- select(df, "MonthlyIncome", "Age", "Attrition", "BusinessTravel", "YearsAtCompany", "YearsInCurrentRole", "TotalWorkingYears", "JobLevel", "JobRole", "Department")
-
 ```
-
-
-
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #             Prepare data for Modeling  Train Test SPlit
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-
-
 ```{r, T/T/S}
-
-
-
 set.seed(31) # get that prime number read, you know the drill.
 
 sample_size = round(nrow(saldat)*.70) # setting what is 70%
@@ -853,37 +627,22 @@ dim(test)
 
 str(training)
 summary(saldat)
-
-
 ```
-
-
-
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #                    find important Var
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-
 ```{r. filter variable importance}
-
-
 roc_imp <- filterVarImp(x = training[-1], y = training$MonthlyIncome)
 head(roc_imp)
 roc_imp
-
-
 ```
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #                      Bayesion Lasso Regression 
                                   or 
       the avg of posterior estimates of the regression coefficients 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-```{r, BLASSO Baby }
-
-detach("package:class")
+```{r,BLASSO Baby}
 library(caret)
-
-
 BLASSO <- train(MonthlyIncome~., training, method = 'blassoAveraged')
 
 #predict on Test Set
@@ -894,18 +653,11 @@ summary(GLM.Pred)
 RMSE <- sqrt(mean((test$MonthlyIncome - GLM.Pred)^2))
 RMSE
   #1022.88
-
-
 ```
-
-
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #               Begin Salary Predictions Prep
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-
 ```{r, Import Competition data}
-
 salaryCompset <- read.csv("https://raw.githubusercontent.com/JosephLazarus/CaseStudy2DDS_Work_Place_Attrition/main/CaseStudy2CompSet%20No%20Salary.csv")
 
 str(salaryCompset)
@@ -949,17 +701,10 @@ summary(salaryPredictionData)
 colSums(is.na(salaryPredictionData))
 
 ```
-
-
-
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #                      Make Salary Predictions
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-
-
 ```{r,Salary Predictions}
-
 set.seed(3967) # big prime no wammies
 
 predictSalary <- train(MonthlyIncome ~ ., data= saldat, method = 'blassoAveraged')
@@ -976,12 +721,4 @@ case2SalaryPredictions <-cbind(salaryPredictionData, salary)
 case2SalaryPredictions <- select(case2SalaryPredictions, -c("Age", "Attrition", "BusinessTravel", "YearsAtCompany", "YearsInCurrentRole", "TotalWorkingYears", "JobLevel", "JobRole", "Department"))
 
 write.csv(case2SalaryPredictions, "Case2PredictionsLAZARUSSalary.csv", row.names = FALSE)
-
-
-```
-
-```{r}
-
-sessionInfo()
-
 ```
