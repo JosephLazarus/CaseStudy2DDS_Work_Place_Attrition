@@ -77,9 +77,10 @@ colSums(is.na(df)) # still no NA's I believe it now
 # no NA's
 
 summary(df)
-
+library(skimr)
 skim(df) #over18  Employeecount Standardhours have no variation
 
+library(dplyr)
 #removing these variables from the data set
 df <- select(df, -c(Over18, EmployeeCount, StandardHours, EmployeeNumber))
 
@@ -130,6 +131,7 @@ tapply(YearsInCurrentRole, Attrition, mean)
 quantile(YearsWithCurrManager)
 tapply(YearsWithCurrManager, Attrition, mean)
 
+library(ggplot2)
 #observed a concentration in younger employees Lets plot this
 df %>% ggplot(aes(x = Age)) + geom_histogram(aes(fill = Attrition), bins = 50) + ggtitle("Histogram of Age Distribion")
 
@@ -199,6 +201,7 @@ length(df)
 #since number of companies worked at prior lets explore further create New variable of time spent in previous jobs subtratct total work years from years at company divide by number of companies worked for
 df$time.at.past.job <- ifelse(df$NumCompaniesWorked!=0, df$TotalWorkingYears-df$YearsAtCompany/df$NumCompaniesWorked,0)
 
+library(BBmisc)
 #found this column to not enhance the models unitil i normalized it
 df$ntime.at.past.job <- normalize(df$time.at.past.job, method = "standardize", margin = 1L, on.constant ="quiet" )
          #df$ntime.at.past.job
@@ -220,7 +223,9 @@ detach("package:BBmisc")
 #did not find it to be helpful in the knn analysis
 # taking these out for fun   2/171625
 
-dat <- select(df, c(3,2,5,7,8,10, 12, 13, 14, 16, 18, 20, 21, 22, 23, 24, 25, 26, 27, 29, 30, 31, 44, 39, 40, 43))
+#dat <- select(df, c(3,2,5,7,8,10, 12, 13, 14, 16, 18, 20, 21, 22, 23, 24, 25, 26, 27, 29, 30, 31, 44, 39, 40, 43))
+library(dplyr)
+dat <- select(df, c("Attrition", "Age", "Department", "EnvironmentSatisfaction", "NumCompaniesWorked", "JobInvolvement","JobLevel", "JobSatisfaction", "iMaritalStatus","MonthlyIncome", "OverTime","StockOptionLevel", "TotalWorkingYears", "YearsAtCompany", "YearsInCurrentRole", "YearsWithCurrManager" ,"YearsInCurrentRole.Group", "YearsAtCompany.Group", "MonthlyIncome"))
 
 
 set.seed(43) # was 31 chainging to another prime
@@ -256,6 +261,7 @@ roc_imp <- filterVarImp(x = training[-1], y = training$Attrition)
 head(roc_imp)
 roc_imp
 
+sort(roc_imp$Yes, decreasing = TRUE)
 
 ```
 
@@ -272,7 +278,7 @@ SVMModel <- train(Attrition~., training , method = 'svmRadial',trControl = train
 #Predict
 SVM.pred <- predict(SVMModel,test)
 #Print confusion matrix
-SVM.CM <- confusionMatrix(test$Attrition, SVM.pred)
+SVM.CM <- confusionMatrix(SVM.pred, test$Attrition)
 SVM.CM
 
 
@@ -285,6 +291,8 @@ SVM.CM
 ```{r, Decesion Tree Model}
 
 set.seed(31) # I like to use prime numbers as seeds. IDK why. Just like 'em
+
+library(rpart.plot)
 
 DTModel <-rpart(formula = Attrition ~., data = training, method = 'class')
 rpart.plot(DTModel, type = 3, clip.right.labs = FALSE, branch = .3, under = TRUE )
@@ -330,22 +338,24 @@ Knn.CM
 
 ```{r, Hyper Parameter Tuning}
 #using the class package to have more control
-detach("package:caret")   
+  
 library(class)
 library(caret)
 library(dplyr)
 
-dat2 <- select(df, c("Attrition", "Age",'NumCompaniesWorked', 'ntime.at.past.job', 
-                    'DistanceFromHome', 'EnvironmentSatisfaction','JobInvolvement', 
-                    'JobSatisfaction', 'RelationshipSatisfaction','StockOptionLevel', 
-                    'TotalWorkingYears','TrainingTimesLastYear', 'WorkLifeBalance', 
-                    'YearsInCurrentRole', 'YearsSinceLastPromotion','YearsWithCurrManager',
-                    'iJobRole', 'iDepartment', "iMaritalStatus"))
+#dat2 <- select(df, c("Attrition", "Age",'NumCompaniesWorked', 'ntime.at.past.job', 
+#                    'DistanceFromHome', 'EnvironmentSatisfaction','JobInvolvement', 
+#                    'JobSatisfaction', 'RelationshipSatisfaction','StockOptionLevel', 
+#                    'TotalWorkingYears','TrainingTimesLastYear', 'WorkLifeBalance', 
+#                    'YearsInCurrentRole', 'YearsSinceLastPromotion','YearsWithCurrManager',
+#                    'iJobRole', 'iDepartment', "iMaritalStatus"))
+#dat2$OverTime <- as.numeric(dat2$OverTime)
 
+dat2 <- select(df, c("Attrition", "Age", "NumCompaniesWorked", "JobInvolvement","JobLevel", "JobSatisfaction", "iMaritalStatus","MonthlyIncome", "StockOptionLevel", "TotalWorkingYears", "YearsAtCompany", "YearsInCurrentRole", "YearsWithCurrManager", "MonthlyIncome"))
 detach("package:dplyr")
 
 set.seed(443) # big prime no wammies
-iterations = 500
+iterations = 20
 numks = 20
 splitPerc = .70
 
@@ -361,9 +371,9 @@ for(j in 1:iterations)
   
   for(i in 1:numks)
   {
-    classifications = knn(train.k2[,2:19],test.k2[,2:19],train.k2$Attrition ,k=i,prob = TRUE)
+    classifications = knn(train.k2[,2:13],test.k2[,2:13],train.k2$Attrition ,k=i,prob = TRUE)
     table(test.k2$Attrition ,classifications)
-    CM = confusionMatrix(table(test.k2$Attrition,classifications))
+    CM = confusionMatrix(table(classifications, test.k2$Attrition))
     masterAcc[j,i] = CM$overall[1]
     masterSens[j,i] = mean(CM$byClass['Sensitivity'])
     masterSpec[j,i] = mean(CM$byClass['Specificity'] )
@@ -390,7 +400,7 @@ max(na.omit(MeanSpec)) #best avg sensitivity i could produce us 0.658
 set.seed(29)
 
 
-classifications = knn(train.k2[,2:19], test.k2[,2:19], train.k2$Attrition,
+classifications = knn(train.k2[,2:13], test.k2[,2:13], train.k2$Attrition,
                       k=9, prob = TRUE)
 table(test.k2$Attrition, classifications)
 KNN.CM = confusionMatrix(table(test.k2$Attrition, classifications))
@@ -495,8 +505,19 @@ detach("package:caret")
 detach("package:class")
 set.seed(31)
 library(e1071)
+library(dplyr)
+dat <- select(df, c("Attrition", "Age", "NumCompaniesWorked", "JobInvolvement","JobLevel", "JobSatisfaction", "iMaritalStatus","MonthlyIncome", "OverTime","StockOptionLevel", "TotalWorkingYears", "YearsAtCompany", "YearsInCurrentRole", "YearsWithCurrManager" ,"YearsInCurrentRole.Group", "YearsAtCompany.Group", "MonthlyIncome"))
+
+#dat <- select(df, c("Attrition", "MonthlyIncome", "TotalWorkingYears", "OverTime", "YearsAtCompany", "StockOptionLevel", "JobLevel", "JobInvolvement", "Education", "EnvironmentSatisfaction", "NumCompaniesWorked", "DistanceFromHome", "YearsInCurrentRole", "YearsAtCompany.Group",  "YearsInCurrentRole.Group", "YearsWithCurrManager.Group", "MonthlyIncome.Group", "Age.Group"))
+
+sample_size = round(nrow(dat)*.70) # setting what is 70%
+index <- sample(seq_len(nrow(dat)), size = sample_size)
+
+training <- dat[index, ]
+test <- dat[-index, ]
+
 #Fit the model on train data
-NBModel <- naiveBayes(Attrition ~., data=training, laplace = -1, usekernel = TRUE)
+NBModel <- naiveBayes(Attrition ~., data=training, laplace = 1)
 
 #Validate on test set
 NBM_pred <- predict(NBModel, newdata =test[-1])
@@ -506,6 +527,9 @@ library(caret)
 NBM.CM<-confusionMatrix(NBM_pred, as.factor(test$Attrition))
 NBM.CM
 
+roc_imp <- filterVarImp(x = training[-1], y = training$Attrition)
+head(roc_imp)
+roc_imp
 
 draw_confusion_matrix <- function(cm,Class1,Class2) {
   
@@ -553,6 +577,7 @@ draw_confusion_matrix <- function(cm,Class1,Class2) {
   text(70, 20, round(as.numeric(cm$overall[2]), 3), cex=1.4)
 }  
 
+
 draw_confusion_matrix(NBM.CM,"Attrition No","Attrition Yes")
 
 
@@ -580,6 +605,7 @@ RF.pred = predict(RFModel,newdata = test[-1],type="response")
 RFM.CM<-confusionMatrix(RF.pred, test$Attrition)
 RFM.CM
 
+detach("package:randomForest")  
 
 ```
 
@@ -750,7 +776,7 @@ detach("package:BBmisc")
 
 #don't forget ID
 
-attritionPredictionData <- select(attritionCompSet, c("ID","Age","DailyRate","DistanceFromHome" ,"Education","EnvironmentSatisfaction","HourlyRate" ,"JobInvolvement", "JobLevel" , "JobSatisfaction" ,"MonthlyIncome", "NumCompaniesWorked", "OverTime", "PercentSalaryHike","PerformanceRating" ,"RelationshipSatisfaction","StockOptionLevel", "TotalWorkingYears" , "TrainingTimesLastYear", "YearsAtCompany" ,"YearsInCurrentRole","YearsSinceLastPromotion" ,"time.at.past.job" ,"Age.Group", "MonthlyIncome.Group" ,"YearsAtCompany.Group"))
+attritionPredictionData <- select(attritionCompSet, c("ID","Age", "NumCompaniesWorked", "JobInvolvement","JobLevel", "JobSatisfaction", "iMaritalStatus","MonthlyIncome", "OverTime","StockOptionLevel", "TotalWorkingYears", "YearsAtCompany", "YearsInCurrentRole", "YearsWithCurrManager" ,"YearsInCurrentRole.Group", "YearsAtCompany.Group", "MonthlyIncome"))
 
 
 
@@ -775,28 +801,46 @@ colSums(is.na(attritionPredictionData)) # Triple check before we begin modeling
 
 set.seed(7919) #big prime no wammies
 
-detach("package:randomForest")      
+    
 
-library(class) #bring that library back in case randomForest masked it
+library(e1071) #bring that library back in case randomForest masked it
 library(caret)#bring that library back in case randomForest masked it
+NB.Model2 <- naiveBayes(Attrition ~., data=dat, laplace = 1)
+NB.Pred2 <- predict(NB.Model2, newdata = attritionPredictionData)
 
-SVMModel2 <- train(Attrition~., dat, method = 'svmRadial',trControl = trainControl(method = 'repeatedcv',number = 3))
+#save as backup object
+Attrited <- NB.Pred2
+
+Attrited = as.data.frame(Attrited)
+
+#combine the predicitons into the data set
+case2predictions <- cbind(attritionPredictionData, Attrited)
+
+case2predictions <- select(case2predictions, -c("Age", "NumCompaniesWorked", "JobInvolvement","JobLevel", "JobSatisfaction", "iMaritalStatus","MonthlyIncome", "OverTime","StockOptionLevel", "TotalWorkingYears", "YearsAtCompany", "YearsInCurrentRole", "YearsWithCurrManager" ,"YearsInCurrentRole.Group", "YearsAtCompany.Group", "MonthlyIncome"))
+
+#write it a csv in submission format
+write.csv(case2predictions,"Case2Predictions_LAZARUS_Attrition_NB_model.csv", row.names = FALSE)
+
+
+#conver to a data frame 
+#Attrition = as.data.frame(Attrition)
+#SVMModel2 <- train(Attrition~., dat, method = 'svmRadial',trControl = trainControl(method = 'repeatedcv',number = 3))
 
 #predict
-SVM.pred2 <- predict(SVMModel2,attritionPredictionData)
+#SVM.pred2 <- predict(SVMModel2,attritionPredictionData)
 
 
 #saving the object as a back up
-Attrition <- SVM.pred2
+#Attrition <- SVM.pred2
 
 #conver to a data frame 
-Attrition = as.data.frame(Attrition)
+#Attrition = as.data.frame(Attrition)
 
 #combine the predicitons into the data set
-case2predictions <- cbind(attritionPredictionData,Attrition)
+#case2predictions <- cbind(attritionPredictionData,Attrition)
 
 #scrub the data set so only ID and attritions predictions remain
-case2predictions <- select(case2predictions, -c("Age","DailyRate","DistanceFromHome" ,"Education","EnvironmentSatisfaction","HourlyRate" ,"JobInvolvement", "JobLevel" , "JobSatisfaction" ,"MonthlyIncome", "NumCompaniesWorked", "OverTime", "PercentSalaryHike","PerformanceRating" ,"RelationshipSatisfaction","StockOptionLevel", "TotalWorkingYears" , "TrainingTimesLastYear", "YearsAtCompany" ,"YearsInCurrentRole","YearsSinceLastPromotion" ,"time.at.past.job" ,"Age.Group", "MonthlyIncome.Group" ,"YearsAtCompany.Group"))
+#case2predictions <- select(case2predictions, -c("Age","DailyRate","DistanceFromHome" ,"Education","EnvironmentSatisfaction","HourlyRate" ,"JobInvolvement", "JobLevel" , "JobSatisfaction" ,"MonthlyIncome", "NumCompaniesWorked", "OverTime", "PercentSalaryHike","PerformanceRating" ,"RelationshipSatisfaction","StockOptionLevel", "TotalWorkingYears" , "TrainingTimesLastYear", "YearsAtCompany" ,"YearsInCurrentRole","YearsSinceLastPromotion" ,"time.at.past.job" ,"Age.Group", "MonthlyIncome.Group" ,"YearsAtCompany.Group"))
 #write it a csv in submission format
 #write.csv(case2predictions,"Case2Predictions_LAZARUS_Attrition_SVM_model.csv", row.names = FALSE)
 
