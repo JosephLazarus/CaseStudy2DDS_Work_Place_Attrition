@@ -819,7 +819,7 @@ case2predictions <- cbind(attritionPredictionData, Attrited)
 case2predictions <- select(case2predictions, -c("Age", "NumCompaniesWorked", "JobInvolvement","JobLevel", "JobSatisfaction", "iMaritalStatus","MonthlyIncome", "OverTime","StockOptionLevel", "TotalWorkingYears", "YearsAtCompany", "YearsInCurrentRole", "YearsWithCurrManager" ,"YearsInCurrentRole.Group", "YearsAtCompany.Group", "MonthlyIncome"))
 
 #write it a csv in submission format
-write.csv(case2predictions,"Case2Predictions_LAZARUS_Attrition_NB_model.csv", row.names = FALSE)
+#write.csv(case2predictions,"Case2Predictions_LAZARUS_Attrition_NB_model.csv", row.names = FALSE)
 
 
 #conver to a data frame 
@@ -857,12 +857,34 @@ write.csv(case2predictions,"Case2Predictions_LAZARUS_Attrition_NB_model.csv", ro
 
 ```{r, Salary objective: Predictions < 3000 RMSE}
 
-
+library(ggplot2)
+library(corrplot)
 #creating a salary data this was an iteriative process between EDA, filtervarImp function and the models
 
 
 
-saldat <- select(df, "MonthlyIncome", "Age", "Attrition", "BusinessTravel", "YearsAtCompany", "YearsInCurrentRole", "TotalWorkingYears", "JobLevel", "JobRole", "Department")
+saldat <- select(df, "MonthlyIncome", "Age", "YearsAtCompany", "YearsInCurrentRole", "TotalWorkingYears","JobLevel", "Attrition", "BusinessTravel","JobRole", "Department")
+
+salints <- saldat[, 1:6]
+
+salgroups <- saldat[, 10]
+
+pairs(saldat, labels = colnames(salints), pch = 21, bg = rainbow(3)[salgroups], col=rainbow(3)[salgroups], main= "Salary Data", row1attop=TRUE, gap =1, cex.labels =NULL, font.labels=1)
+
+M <- cor(salints)
+
+corrplot(M, method = "square")
+
+saldat %>% ggplot(mapping=aes(y=MonthlyIncome, x=Age,color=Age)) + geom_point(size=0.5, position=position_jitter(width = 0.001, height = 1)) + geom_smooth(method="lm",se=FALSE,size=1)+ labs(title="Correlation between Age and Monthly Income")
+
+saldat %>% ggplot(mapping=aes(y=MonthlyIncome, x=Department,color=Department)) + geom_point(size=0.5, position=position_jitter(width = 0.001, height = 1)) + geom_smooth(method="lm",se=FALSE,size=1)+ labs(title="Correlation between Department and Monthly Income")
+
+
+saldat %>% ggplot(mapping=aes(y=MonthlyIncome, x=YearsAtCompany,color=Department)) + geom_point(size=0.5, position=position_jitter(width = 0.001, height = 1)) + geom_smooth(method="lm",se=TRUE,size=1)+ labs(title="Correlation between YearsAtCompany and Monthly Income")
+
+saldat %>% ggplot(mapping=aes(y=MonthlyIncome, x=TotalWorkingYears,color=JobLevel)) + geom_point(size=0.5, position=position_jitter(width = 0.001, height = 1)) + geom_smooth(method="lm",se=TRUE,size=1)+ labs(title="Correlation between Total Works Years by YearsAtCompany and Monthly Income")
+
+saldat %>% ggplot(mapping=aes(y=MonthlyIncome, x=TotalWorkingYears,color=BusinessTravel)) + geom_point(size=0.5, position=position_jitter(width = 0.001, height = 1)) + geom_smooth(method="lm",se=TRUE,size=1)+ labs(title="Correlation between Total Works Years by YearsAtCompany and Monthly Income")
 
 ```
 
@@ -919,7 +941,7 @@ roc_imp
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ```{r, BLASSO Baby }
 
-detach("package:class")
+
 library(caret)
 
 
