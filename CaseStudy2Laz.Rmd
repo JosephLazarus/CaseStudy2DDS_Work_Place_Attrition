@@ -57,7 +57,7 @@ theme_update(plot.title = element_text(hjust = 0.5)) # changing default to cente
 ```{r}
 
 
-df <- read.csv("https://raw.githubusercontent.com/JosephLazarus/CaseStudy2DDS_Work_Place_Attrition/main/CaseStudy2-data.csv")
+df <- read.csv("https://raw.githubusercontent.com/JosephLazarus/CaseStudy2DDS_Work_Place_Attrition/main/the_data_folder/CaseStudy2-data.csv")
 
 head(df)
 # attach df to read variavles locally
@@ -248,6 +248,9 @@ detach("package:tidyverse")
 
 ```{r}
 #This was an interative step between modeling data preparation and EDA as well.
+
+library(pROC)
+library(caret)
 
 roc_imp <- filterVarImp(x = training[-1], y = training$Attrition)
 head(roc_imp)
@@ -664,7 +667,7 @@ f1.p
 ```{r, Attrition Competition}
 
 #read in the competition Data set
-attritionCompSet <- read.csv("https://raw.githubusercontent.com/JosephLazarus/CaseStudy2DDS_Work_Place_Attrition/main/CaseStudy2CompSet%20No%20Attrition.csv")
+attritionCompSet <-read.csv("https://raw.githubusercontent.com/JosephLazarus/CaseStudy2DDS_Work_Place_Attrition/main/the_data_folder/CaseStudy2CompSet%20No%20Attrition.csv")
 
 
 head(attritionCompSet)
@@ -677,17 +680,9 @@ str(attritionCompSet)
 
 dim(attritionCompSet) #870 X 36
 
-which(is.na(attritionCompSet)) # no NA's I don't believe it
+which(is.na(attritionCompSet)) # make sure no funny business is going on with the comp set
 
-colSums(is.na(attritionCompSet)) # still no NA's I believe it now
-
-# 870 obs x 36 variables
-# no NA's
-
-summary(attritionCompSet)
-
-skim(attritionCompSet) #over18  Employeecount Standardhours have no variation
-
+library(dplyr)
 #removing these variables from the data set
 attritionCompSet <- select(attritionCompSet, -c(Over18, EmployeeCount, StandardHours, EmployeeNumber))
 
@@ -710,8 +705,7 @@ attritionCompSet <- mutate(attritionCompSet, Age.Group = as.factor(case_when(Age
                                                  Age <= 34 ~'Young-Professional',
                                                  Age <= 44 ~ 'Veteran',
                                                  Age >= 45 ~ 'Senior')))
-#use quantiles to pick income brackets
-quantile(MonthlyIncome)
+
 
 attritionCompSet <- mutate(attritionCompSet, MonthlyIncome.Group = as.factor(case_when(MonthlyIncome <= 2800 ~ 'Low',
                                                            MonthlyIncome <=4999 ~ 'Avg', 
@@ -743,10 +737,9 @@ attritionCompSet <- mutate(attritionCompSet, YearsAtCompany.Group = as.factor(ca
 
 #chceck for gaps
 which(is.na(attritionCompSet))
-str(attritionCompSet)
-length(attritionCompSet)
 
-#since number of companies worked at prior lets explore further create New variable of time spent in previous jobs subtratct total work years from years at company divide by number of companies worked for
+
+#create the other column
 attritionCompSet$time.at.past.job <- ifelse(attritionCompSet$NumCompaniesWorked!=0, attritionCompSet$TotalWorkingYears-attritionCompSet$YearsAtCompany/attritionCompSet$NumCompaniesWorked,0)
 
 library(BBmisc)
@@ -805,7 +798,7 @@ case2predictions <- cbind(attritionPredictionData,Attrition)
 #scrub the data set so only ID and attritions predictions remain
 case2predictions <- select(case2predictions, -c("Age","DailyRate","DistanceFromHome" ,"Education","EnvironmentSatisfaction","HourlyRate" ,"JobInvolvement", "JobLevel" , "JobSatisfaction" ,"MonthlyIncome", "NumCompaniesWorked", "OverTime", "PercentSalaryHike","PerformanceRating" ,"RelationshipSatisfaction","StockOptionLevel", "TotalWorkingYears" , "TrainingTimesLastYear", "YearsAtCompany" ,"YearsInCurrentRole","YearsSinceLastPromotion" ,"time.at.past.job" ,"Age.Group", "MonthlyIncome.Group" ,"YearsAtCompany.Group"))
 #write it a csv in submission format
-write.csv(case2predictions,"Case2Predictions_LAZARUS_Attrition_SVM_model.csv", row.names = FALSE)
+#write.csv(case2predictions,"Case2Predictions_LAZARUS_Attrition_SVM_model.csv", row.names = FALSE)
 
 
 ```
@@ -822,6 +815,8 @@ write.csv(case2predictions,"Case2Predictions_LAZARUS_Attrition_SVM_model.csv", r
 
 
 #creating a salary data this was an iteriative process between EDA, filtervarImp function and the models
+
+
 
 saldat <- select(df, "MonthlyIncome", "Age", "Attrition", "BusinessTravel", "YearsAtCompany", "YearsInCurrentRole", "TotalWorkingYears", "JobLevel", "JobRole", "Department")
 
@@ -906,7 +901,7 @@ RMSE
 
 ```{r, Import Competition data}
 
-salaryCompset <- read.csv("https://raw.githubusercontent.com/JosephLazarus/CaseStudy2DDS_Work_Place_Attrition/main/CaseStudy2CompSet%20No%20Salary.csv")
+salaryCompset <- read.csv("https://raw.githubusercontent.com/JosephLazarus/CaseStudy2DDS_Work_Place_Attrition/main/the_data_folder/CaseStudy2CompSet%20No%20Salary.csv")
 
 str(salaryCompset)
 colnames(salaryCompset)
@@ -940,8 +935,14 @@ colSums(is.na(salaryCompset))
 
 salaryCompset$time.at.past.job <- ifelse(salaryCompset$NumCompaniesWorked!=0, salaryCompset$TotalWorkingYears-salaryCompset$YearsAtCompany/salaryCompset$NumCompaniesWorked,0)
 
+library(BBmisc)
+
 salaryCompset$ntime.at.past.job <- normalize(salaryCompset$time.at.past.job,  method = "standardize", on.constant = "quiet")
+
+detach("package:BBmisc")
+
 colnames(salaryCompset)
+
 
 salaryPredictionData <- select(salaryCompset, c("ID", "Age", "Attrition", "BusinessTravel", "YearsAtCompany", "YearsInCurrentRole", "TotalWorkingYears", "JobLevel", "JobRole", "Department"))
 colnames(salaryPredictionData)
@@ -975,7 +976,7 @@ case2SalaryPredictions <-cbind(salaryPredictionData, salary)
 
 case2SalaryPredictions <- select(case2SalaryPredictions, -c("Age", "Attrition", "BusinessTravel", "YearsAtCompany", "YearsInCurrentRole", "TotalWorkingYears", "JobLevel", "JobRole", "Department"))
 
-write.csv(case2SalaryPredictions, "Case2PredictionsLAZARUSSalary.csv", row.names = FALSE)
+#write.csv(case2SalaryPredictions, "Case2PredictionsLAZARUSSalary.csv", row.names = FALSE)
 
 
 ```
