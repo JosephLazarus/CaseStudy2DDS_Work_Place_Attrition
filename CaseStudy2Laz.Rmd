@@ -225,7 +225,9 @@ detach("package:BBmisc")
 
 #dat <- select(df, c(3,2,5,7,8,10, 12, 13, 14, 16, 18, 20, 21, 22, 23, 24, 25, 26, 27, 29, 30, 31, 44, 39, 40, 43))
 library(dplyr)
-dat <- select(df, c("Attrition", "Age", "Department", "EnvironmentSatisfaction", "NumCompaniesWorked", "JobInvolvement","JobLevel", "JobSatisfaction", "iMaritalStatus","MonthlyIncome", "OverTime","StockOptionLevel", "TotalWorkingYears", "YearsAtCompany", "YearsInCurrentRole", "YearsWithCurrManager" ,"YearsInCurrentRole.Group", "YearsAtCompany.Group", "MonthlyIncome"))
+#dat <- select(df, c("Attrition", "Age", "Department", "EnvironmentSatisfaction", "NumCompaniesWorked", "JobInvolvement","JobLevel", "JobSatisfaction", "iMaritalStatus","MonthlyIncome", "OverTime","StockOptionLevel", "TotalWorkingYears", "YearsAtCompany", "YearsInCurrentRole", "YearsWithCurrManager" ,"YearsInCurrentRole.Group", "YearsAtCompany.Group", "MonthlyIncome"))
+
+dat <- select(df,c("Attrition","Age.Group", "DistanceFromHome", "MonthlyIncome.Group", "TotalWorkingYears", "OverTime", "YearsAtCompany", "StockOptionLevel", "JobRole", "JobLevel", "JobInvolvement", "Education", "EnvironmentSatisfaction", "WorkLifeBalance", "YearsInCurrentRole", "YearsAtCompany.Group",  "YearsInCurrentRole", "YearsWithCurrManager"))
 
 
 set.seed(43) # was 31 chainging to another prime
@@ -343,15 +345,12 @@ library(class)
 library(caret)
 library(dplyr)
 
-#dat2 <- select(df, c("Attrition", "Age",'NumCompaniesWorked', 'ntime.at.past.job', 
-#                    'DistanceFromHome', 'EnvironmentSatisfaction','JobInvolvement', 
-#                    'JobSatisfaction', 'RelationshipSatisfaction','StockOptionLevel', 
-#                    'TotalWorkingYears','TrainingTimesLastYear', 'WorkLifeBalance', 
-#                    'YearsInCurrentRole', 'YearsSinceLastPromotion','YearsWithCurrManager',
-#                    'iJobRole', 'iDepartment', "iMaritalStatus"))
-#dat2$OverTime <- as.numeric(dat2$OverTime)
+dat2 <- select(df, c("Attrition", "Age",'NumCompaniesWorked', 'ntime.at.past.job',  'DistanceFromHome', 'EnvironmentSatisfaction', 'JobInvolvement',  'JobSatisfaction', 'OverTime', 'RelationshipSatisfaction', 'StockOptionLevel',  'TotalWorkingYears','TrainingTimesLastYear', 'WorkLifeBalance',  'YearsInCurrentRole', 'YearsSinceLastPromotion', 'YearsWithCurrManager', 'iJobRole', 'iDepartment', "iMaritalStatus"))
 
-dat2 <- select(df, c("Attrition", "Age", "NumCompaniesWorked", "JobInvolvement","JobLevel", "JobSatisfaction", "iMaritalStatus","MonthlyIncome", "StockOptionLevel", "TotalWorkingYears", "YearsAtCompany", "YearsInCurrentRole", "YearsWithCurrManager", "MonthlyIncome"))
+
+dat2$OverTime <- as.numeric(dat2$OverTime)
+
+
 detach("package:dplyr")
 
 set.seed(443) # big prime no wammies
@@ -371,7 +370,7 @@ for(j in 1:iterations)
   
   for(i in 1:numks)
   {
-    classifications = knn(train.k2[,2:13],test.k2[,2:13],train.k2$Attrition ,k=i,prob = TRUE)
+    classifications = knn(train.k2[,2:20],test.k2[,2:20],train.k2$Attrition ,k=i,prob = TRUE)
     table(test.k2$Attrition ,classifications)
     CM = confusionMatrix(table(classifications, test.k2$Attrition))
     masterAcc[j,i] = CM$overall[1]
@@ -400,8 +399,8 @@ max(na.omit(MeanSpec)) #best avg sensitivity i could produce us 0.658
 set.seed(29)
 
 
-classifications = knn(train.k2[,2:13], test.k2[,2:13], train.k2$Attrition,
-                      k=9, prob = TRUE)
+classifications = knn(train.k2[,2:20], test.k2[,2:20], train.k2$Attrition,
+                      k=5, prob = TRUE)
 table(test.k2$Attrition, classifications)
 KNN.CM = confusionMatrix(table(test.k2$Attrition, classifications))
 KNN.CM
@@ -473,6 +472,7 @@ draw_confusion_matrix(KNN.CM,"Attrition No","Attrition Yes")
 ```{r, General Linear Regression Model}
 set.seed(31)
 
+
 GLMModel <- train(Attrition~., training, method = 'glm', family=binomial, trControl = trainControl(method = 'repeatedcv',number = 5))
 
 #predict on Test Set
@@ -506,7 +506,9 @@ detach("package:class")
 set.seed(31)
 library(e1071)
 library(dplyr)
-dat <- select(df, c("Attrition", "Age", "NumCompaniesWorked", "JobInvolvement","JobLevel", "JobSatisfaction", "iMaritalStatus","MonthlyIncome", "OverTime","StockOptionLevel", "TotalWorkingYears", "YearsAtCompany", "YearsInCurrentRole", "YearsWithCurrManager" ,"YearsInCurrentRole.Group", "YearsAtCompany.Group", "MonthlyIncome"))
+dat <- select(df, c("Attrition", "Age.Group", "DistanceFromHome", "MonthlyIncome.Group", "TotalWorkingYears", "OverTime", "YearsAtCompany", "StockOptionLevel", "JobRole", "JobLevel", "JobInvolvement", "Education", "NumCompaniesWorked", "EnvironmentSatisfaction", "WorkLifeBalance", "YearsInCurrentRole", "YearsAtCompany.Group",  "YearsInCurrentRole", "YearsWithCurrManager"))
+
+#dat <- select(df, c("Attrition", "Age", "NumCompaniesWorked", "ntime.at.past.job", "JobInvolvement","JobLevel", "JobSatisfaction", "iMaritalStatus","MonthlyIncome", "OverTime","StockOptionLevel", "TotalWorkingYears", "YearsAtCompany", "YearsInCurrentRole", "YearsWithCurrManager" ,"YearsInCurrentRole.Group", "YearsAtCompany.Group", "MonthlyIncome.Group"))
 
 #dat <- select(df, c("Attrition", "MonthlyIncome", "TotalWorkingYears", "OverTime", "YearsAtCompany", "StockOptionLevel", "JobLevel", "JobInvolvement", "Education", "EnvironmentSatisfaction", "NumCompaniesWorked", "DistanceFromHome", "YearsInCurrentRole", "YearsAtCompany.Group",  "YearsInCurrentRole.Group", "YearsWithCurrManager.Group", "MonthlyIncome.Group", "Age.Group"))
 
@@ -517,7 +519,7 @@ training <- dat[index, ]
 test <- dat[-index, ]
 
 #Fit the model on train data
-NBModel <- naiveBayes(Attrition ~., data=training, laplace = 1)
+NBModel <- naiveBayes(Attrition ~., data=training, laplace = -1)
 
 #Validate on test set
 NBM_pred <- predict(NBModel, newdata =test[-1])
@@ -527,7 +529,7 @@ library(caret)
 NBM.CM<-confusionMatrix(NBM_pred, as.factor(test$Attrition))
 NBM.CM
 
-roc_imp <- filterVarImp(x = training[-1], y = training$Attrition)
+roc_imp <- filterVarImp(x = training[-1], y = training$Attrition, scale = FALSE)
 head(roc_imp)
 roc_imp
 
@@ -668,10 +670,10 @@ pr.p <-casestudy.results %>% ggplot(aes(Models, Precisions, fill = Models)) + ge
   geom_text(aes(label=Precisions),vjust=3, size = 4) + ggtitle('Comparative Precisions') + xlab('') + ylab('')
 
 ba.p <- casestudy.results %>% ggplot(aes(Models, Balanced_Accuracies, fill = Models)) + geom_bar(stat='identity', alpha = 0.5) + 
-  geom_text(aes(label=Balanced_Accuracies),vjust=3, size = 4) + ggtitle('Comparative Balanced_Accuracies') + xlab('') + ylab('')
+  geom_text(aes(label=Balanced_Accuracies),vjust=3, size = 4) + ggtitle('Comparative Balanced Accuracies') + xlab('') + ylab('')
 
 f1.p <- casestudy.results %>% ggplot(aes(Models, F1_Scores, fill = Models)) + geom_bar(stat='identity', alpha = 0.5) + 
-  geom_text(aes(label=F1_Scores),vjust=3, size = 4) + ggtitle('Comparative F1_Scores') + xlab('') + ylab('')
+  geom_text(aes(label=F1_Scores),vjust=3, size = 4) + ggtitle('Comparative F1 Scores') + xlab('') + ylab('')
 
  
 sn.p
@@ -776,7 +778,8 @@ detach("package:BBmisc")
 
 #don't forget ID
 
-attritionPredictionData <- select(attritionCompSet, c("ID","Age", "NumCompaniesWorked", "JobInvolvement","JobLevel", "JobSatisfaction", "iMaritalStatus","MonthlyIncome", "OverTime","StockOptionLevel", "TotalWorkingYears", "YearsAtCompany", "YearsInCurrentRole", "YearsWithCurrManager" ,"YearsInCurrentRole.Group", "YearsAtCompany.Group", "MonthlyIncome"))
+attritionPredictionData <- select(attritionCompSet, c("ID","Age.Group", "DistanceFromHome", "MonthlyIncome.Group", "TotalWorkingYears", "OverTime", "YearsAtCompany", "StockOptionLevel", "JobRole", "JobLevel", "JobInvolvement", "Education", "EnvironmentSatisfaction", "WorkLifeBalance", "YearsInCurrentRole", "YearsAtCompany.Group",  "YearsInCurrentRole", "YearsWithCurrManager"))
+
 
 
 
@@ -816,7 +819,7 @@ Attrited = as.data.frame(Attrited)
 #combine the predicitons into the data set
 case2predictions <- cbind(attritionPredictionData, Attrited)
 
-case2predictions <- select(case2predictions, -c("Age", "NumCompaniesWorked", "JobInvolvement","JobLevel", "JobSatisfaction", "iMaritalStatus","MonthlyIncome", "OverTime","StockOptionLevel", "TotalWorkingYears", "YearsAtCompany", "YearsInCurrentRole", "YearsWithCurrManager" ,"YearsInCurrentRole.Group", "YearsAtCompany.Group", "MonthlyIncome"))
+case2predictions <- select(case2predictions, -c("Age.Group", "DistanceFromHome", "MonthlyIncome.Group", "TotalWorkingYears", "OverTime", "YearsAtCompany", "StockOptionLevel", "JobRole", "JobLevel", "JobInvolvement", "Education", "EnvironmentSatisfaction", "WorkLifeBalance", "YearsInCurrentRole", "YearsAtCompany.Group",  "YearsInCurrentRole", "YearsWithCurrManager"))
 
 #write it a csv in submission format
 #write.csv(case2predictions,"Case2Predictions_LAZARUS_Attrition_NB_model.csv", row.names = FALSE)
@@ -859,6 +862,7 @@ case2predictions <- select(case2predictions, -c("Age", "NumCompaniesWorked", "Jo
 
 library(ggplot2)
 library(corrplot)
+
 #creating a salary data this was an iteriative process between EDA, filtervarImp function and the models
 
 
@@ -877,14 +881,14 @@ corrplot(M, method = "square")
 
 saldat %>% ggplot(mapping=aes(y=MonthlyIncome, x=Age,color=Age)) + geom_point(size=0.5, position=position_jitter(width = 0.001, height = 1)) + geom_smooth(method="lm",se=FALSE,size=1)+ labs(title="Correlation between Age and Monthly Income")
 
-saldat %>% ggplot(mapping=aes(y=MonthlyIncome, x=Department,color=Department)) + geom_point(size=0.5, position=position_jitter(width = 0.001, height = 1)) + geom_smooth(method="lm",se=FALSE,size=1)+ labs(title="Correlation between Department and Monthly Income")
+saldat %>% ggplot(mapping=aes(y=MonthlyIncome, x=JobLevel,color=Department)) + geom_point(size=0.5, position=position_jitter(width = 0.001, height = 1)) + geom_smooth(method="lm",se=FALSE,size=1)+ labs(title="Scatter plot Income by JobLevel")
 
 
-saldat %>% ggplot(mapping=aes(y=MonthlyIncome, x=YearsAtCompany,color=Department)) + geom_point(size=0.5, position=position_jitter(width = 0.001, height = 1)) + geom_smooth(method="lm",se=TRUE,size=1)+ labs(title="Correlation between YearsAtCompany and Monthly Income")
+saldat %>% ggplot(mapping=aes(y=MonthlyIncome, x=YearsAtCompany,color=Department)) + geom_point(size=0.5, position=position_jitter(width = 0.001, height = 1)) + geom_smooth(method="lm",se=TRUE,size=1)+ labs(title="Monthly Income Years at the Co.")
 
-saldat %>% ggplot(mapping=aes(y=MonthlyIncome, x=TotalWorkingYears,color=JobLevel)) + geom_point(size=0.5, position=position_jitter(width = 0.001, height = 1)) + geom_smooth(method="lm",se=TRUE,size=1)+ labs(title="Correlation between Total Works Years by YearsAtCompany and Monthly Income")
+saldat %>% ggplot(mapping=aes(y=MonthlyIncome, x=TotalWorkingYears,color=JobLevel)) + geom_point(size=0.5, position=position_jitter(width = 0.001, height = 1)) + geom_smooth(method="lm",se=TRUE,size=1)+ labs(title="Monthly Income ")
 
-saldat %>% ggplot(mapping=aes(y=MonthlyIncome, x=TotalWorkingYears,color=BusinessTravel)) + geom_point(size=0.5, position=position_jitter(width = 0.001, height = 1)) + geom_smooth(method="lm",se=TRUE,size=1)+ labs(title="Correlation between Total Works Years by YearsAtCompany and Monthly Income")
+saldat %>% ggplot(mapping=aes(y=MonthlyIncome, x=TotalWorkingYears,color=BusinessTravel)) + geom_point(size=0.5, position=position_jitter(width = 0.001, height = 1)) + geom_smooth(method="lm",se=TRUE,size=1)+ labs(title="Income by Total Working Years | business Travel")
 
 ```
 
@@ -925,9 +929,9 @@ summary(saldat)
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
-```{r. filter variable importance}
-
-
+```{r, filter variable importance}
+library(caret)
+library(MASS)
 roc_imp <- filterVarImp(x = training[-1], y = training$MonthlyIncome)
 head(roc_imp)
 roc_imp
@@ -947,14 +951,31 @@ library(caret)
 
 BLASSO <- train(MonthlyIncome~., training, method = 'blassoAveraged')
 
+predict(BLASSO$finalModel, type = 'coefficients')
+
+coef(BLASSO$finalModel,unlist(BLASSO$bestTune))
+
+lm(MonthlyIncome~., training)
+
 #predict on Test Set
 GLM.Pred <- predict(BLASSO, newdata =  test[-1])
 
+
+
+qqplot
 #printing summary
 summary(GLM.Pred)
 RMSE <- sqrt(mean((test$MonthlyIncome - GLM.Pred)^2))
 RMSE
   #1022.88
+
+postResample(pred = GLM.Pred, obs = test$MonthlyIncome)
+
+hist(GLM.Pred, main = "Distribution of Predictions", xlab = "Salary Predictions")
+
+
+
+
 
 
 ```
